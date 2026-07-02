@@ -110,7 +110,7 @@ export default function App() {
       }
       setConnectUrl(data.connect_url);
       addLog("SYS", "connected", `API ${latency}ms`);
-      // Proxy through backend to avoid browser Origin header rejection by LiveKit
+      // Proxy through backend to avoid browser Origin header rejection
       const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
       const proxyUrl = `${wsProto}//${window.location.host}/ws/proxy?url=${encodeURIComponent(data.connect_url)}`;
       connectWebSocket(proxyUrl);
@@ -365,7 +365,7 @@ export default function App() {
                 <option value="outbound">Outbound</option>
               </select>
             </div>
-            {connectUrl && <div className="connect-url"><code>{connectUrl}</code></div>}
+            {connectUrl && <div className="connect-url">Session: <code>{connectUrl.split("/").pop()}</code></div>}
             <div className="btn-row">
               {!isConnected ? (
                 <button className="btn btn-primary" onClick={handleConnect} disabled={status === STATUS.CONNECTING}>
