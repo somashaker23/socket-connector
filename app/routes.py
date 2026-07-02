@@ -1,7 +1,10 @@
+import asyncio
 import logging
 import time
+from urllib.parse import unquote
 
-from fastapi import APIRouter, Request
+import aiohttp
+from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 from .connector import create_connector_session
@@ -46,6 +49,53 @@ async def smartflo_connect(request: Request) -> JSONResponse:
 
     logger.info("Connector session created", extra={"call_id": call_id, "connect_url": connect_url})
     return JSONResponse({"success": True, "connect_url": connect_url})
+
+
+@router.websocket("/ws/proxy")
+async def ws_proxy(websocket: WebSocket, url: str):
+    """Proxy WebSocket for the playground. Strips Origin header so LiveKit accepts the connection."""
+    target_url = unquote(url)
+    await websocket.accept()
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.ws_connect(target_url) as lk_ws:
+                logger.info("WS proxy connected", extra={"target": target_url[:80]})
+
+                async def browser_to_livekit():
+                    try:
+                        while True:
+                            data = await websocket.receive_text()
+                            await lk_ws.send_str(data)
+                    except WebSocketDisconnect:
+                        pass
+
+                async def livekit_to_browser():
+                    try:
+                        async for msg in lk_ws:
+                            if msg.type == aiohttp.WSMsgType.TEXT:
+                                await websocket.send_text(msg.data)
+                            elif msg.type == aiohttp.WSMsgType.BINARY:
+                                await websocket.send_bytes(msg.data)
+                            elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                                break
+                    except WebSocketDisconnect:
+                        pass
+
+                tasks = [
+                    asyncio.create_task(browser_to_livekit()),
+                    asyncio.create_task(livekit_to_browser()),
+                ]
+                _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                for t in pending:
+                    t.cancel()
+        except Exception as exc:
+            logger.error("WS proxy error", extra={"error": str(exc)})
+        finally:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
 
 
 @router.get("/health")
