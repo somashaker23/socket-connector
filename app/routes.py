@@ -1,7 +1,7 @@
 import asyncio
 import logging
+import secrets
 import time
-from urllib.parse import unquote
 
 import aiohttp
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
@@ -14,10 +14,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Store connect URLs server-side so LiveKit URLs are never exposed
+_pending_sessions: dict[str, str] = {}
+
 
 @router.api_route("/smartflo/connect", methods=["GET", "POST"])
 async def smartflo_connect(request: Request) -> JSONResponse:
-    """SmartFlo calls this to get a LiveKit connect_url for a call."""
+    """SmartFlo calls this to get a connect_url for a call."""
     if request.method == "POST":
         body = await request.json()
     else:
@@ -47,14 +50,26 @@ async def smartflo_connect(request: Request) -> JSONResponse:
     metrics.connector_latency_seconds.observe(time.monotonic() - t0)
     metrics.connector_requests_total.labels(direction=direction, status="success").inc()
 
-    logger.info("Connector session created", extra={"call_id": call_id, "connect_url": connect_url})
-    return JSONResponse({"success": True, "wss_url": connect_url})
+    # Store connect URL server-side, return opaque session token
+    session_id = secrets.token_urlsafe(16)
+    _pending_sessions[session_id] = connect_url
+
+    logger.info("Connector session created", extra={"call_id": call_id, "session_id": session_id})
+
+    host = request.headers.get("host", "")
+    scheme = "wss" if request.headers.get("x-forwarded-proto") == "https" else "ws"
+    wss_url = f"{scheme}://{host}/ws/stream/{session_id}"
+
+    return JSONResponse({"success": True, "wss_url": wss_url})
 
 
-@router.websocket("/ws/proxy")
-async def ws_proxy(websocket: WebSocket, url: str):
-    """Proxy WebSocket for the playground. Strips Origin header so LiveKit accepts the connection."""
-    target_url = unquote(url)
+@router.websocket("/ws/stream/{session_id}")
+async def ws_stream(websocket: WebSocket, session_id: str):
+    """Proxy WebSocket — looks up stored connect URL by session ID."""
+    target_url = _pending_sessions.pop(session_id, None)
+    if not target_url:
+        await websocket.close(code=4004, reason="Invalid or expired session")
+        return
     await websocket.accept()
 
     async with aiohttp.ClientSession() as session:
