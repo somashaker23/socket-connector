@@ -48,7 +48,7 @@ async def smartflo_connect(request: Request) -> JSONResponse:
     metrics.connector_requests_total.labels(direction=direction, status="success").inc()
 
     logger.info("Connector session created", extra={"call_id": call_id, "connect_url": connect_url})
-    return JSONResponse({"success": True, "connect_url": connect_url})
+    return JSONResponse({"success": True, "wss_url": connect_url})
 
 
 @router.websocket("/ws/proxy")

@@ -108,11 +108,11 @@ export default function App() {
         setStatus(STATUS.DISCONNECTED);
         return;
       }
-      setConnectUrl(data.connect_url);
+      setConnectUrl(data.wss_url);
       addLog("SYS", "connected", `API ${latency}ms`);
       // Proxy through backend to avoid browser Origin header rejection
       const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const proxyUrl = `${wsProto}//${window.location.host}/ws/proxy?url=${encodeURIComponent(data.connect_url)}`;
+      const proxyUrl = `${wsProto}//${window.location.host}/ws/proxy?url=${encodeURIComponent(data.wss_url)}`;
       connectWebSocket(proxyUrl);
     } catch (err) {
       addLog("SYS", "error", err.message);
