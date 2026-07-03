@@ -4,6 +4,7 @@ import DtmfKeypad from "./components/DtmfKeypad";
 import EventLog from "./components/EventLog";
 import LatencyPanel from "./components/LatencyPanel";
 import { MicCapture, AudioPlayer } from "./utils/audio";
+import { CallRecorder } from "./utils/recorder";
 import {
   resetSequence,
   buildConnected,
@@ -49,6 +50,8 @@ export default function App() {
   });
   const [markName, setMarkName] = useState("ping-1");
   const [healthStatus, setHealthStatus] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [autoRecord, setAutoRecord] = useState(true);
 
   // Refs
   const wsRef = useRef(null);
@@ -64,6 +67,7 @@ export default function App() {
   const firstMediaSentRef = useRef(null);
   const micAnalyserRef = useRef(null);
   const micAnalyserDataRef = useRef(null);
+  const recorderRef = useRef(new CallRecorder());
 
   const addLog = useCallback((dir, event, detail = "") => {
     setLogs((prev) => {
@@ -165,6 +169,7 @@ export default function App() {
       case "media": {
         if (!playerRef.current) playerRef.current = new AudioPlayer();
         playerRef.current.enqueue(msg.media.payload);
+        recorderRef.current.addRx(msg.media.payload);
         const count = statsRef.current.mediaRecv + 1;
         updateStat("mediaRecv", count);
 
@@ -210,6 +215,7 @@ export default function App() {
         mediaTimestampRef.current += 20;
         const msg = buildMedia(streamSidRef.current, base64Payload, mediaTimestampRef.current);
         wsRef.current.send(msg);
+        recorderRef.current.addTx(base64Payload);
         const count = statsRef.current.mediaSent + 1;
         updateStat("mediaSent", count);
 
@@ -234,6 +240,12 @@ export default function App() {
     startTimeRef.current = Date.now();
     setStatus(STATUS.STREAMING);
     addLog("SYS", "start", "Mic streaming started");
+
+    if (autoRecord && !recording) {
+      recorderRef.current.start();
+      setRecording(true);
+      addLog("SYS", "start", "Auto-recording started");
+    }
 
     durationIntervalRef.current = setInterval(() => {
       if (startTimeRef.current) {
@@ -292,6 +304,19 @@ export default function App() {
     wsRef.current = null;
     lastMediaRecvRef.current = null;
     firstMediaSentRef.current = null;
+    if (recorderRef.current.recording) {
+      recorderRef.current.stop();
+      if (recorderRef.current.hasData) {
+        const now = new Date();
+        const ist = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+        const dd = String(ist.getDate()).padStart(2, "0");
+        const mmm = ist.toLocaleString("en-US", { month: "short" });
+        const hh = String(ist.getHours()).padStart(2, "0");
+        const mm = String(ist.getMinutes()).padStart(2, "0");
+        recorderRef.current.download(`${callId}_${dd}-${mmm}_${hh}-${mm}.wav`);
+      }
+    }
+    setRecording(false);
     setStatus(STATUS.DISCONNECTED);
     setMuted(false);
   };
@@ -383,7 +408,13 @@ export default function App() {
           </section>
 
           <section className="card">
-            <h3>Audio</h3>
+            <div className="card-header">
+              <h3>Audio</h3>
+              <label className="auto-record-toggle">
+                <input type="checkbox" checked={autoRecord} onChange={(e) => setAutoRecord(e.target.checked)} />
+                Auto Record
+              </label>
+            </div>
             <div className="waveforms">
               <Waveform analyserGetter={getMicWaveform} label="Mic (TX)" color="#60a5fa" />
               <Waveform analyserGetter={getPlayerWaveform} label="Speaker (RX)" color="#4ade80" />

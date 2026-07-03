@@ -163,6 +163,35 @@ header h1 {
 .btn-sm:hover { background: #2d2d44; }
 .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Card header with toggle */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.card-header h3 {
+  margin-bottom: 0;
+}
+
+.auto-record-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-record-toggle input[type="checkbox"] {
+  accent-color: #dc2626;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
 /* Waveforms */
 .waveforms {
   display: flex;

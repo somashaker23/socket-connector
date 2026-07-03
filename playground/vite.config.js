@@ -6,9 +6,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': {
+      '/smartflo': {
         target: 'http://localhost:8000',
-        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/health': {
+        target: 'http://localhost:8000',
+      },
+      '/metrics': {
+        target: 'http://localhost:8000',
       },
       '/ws': {
         target: 'ws://localhost:8000',
