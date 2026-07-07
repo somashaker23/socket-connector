@@ -36,10 +36,14 @@ export class MicCapture {
     });
     this.audioCtx = new AudioContext();
     const source = this.audioCtx.createMediaStreamSource(this.stream);
+    // Analyser sits between source and processor so it sees live mic data
+    this.analyser = this.audioCtx.createAnalyser();
+    this.analyser.fftSize = 256;
     // ScriptProcessorNode for broad compatibility (AudioWorklet is better but needs separate file)
     this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
     this.processor.onaudioprocess = (e) => this._process(e);
-    source.connect(this.processor);
+    source.connect(this.analyser);
+    this.analyser.connect(this.processor);
     this.processor.connect(this.audioCtx.destination);
   }
 
@@ -70,9 +74,11 @@ export class MicCapture {
 
   stop() {
     this.processor?.disconnect();
+    this.analyser?.disconnect();
     this.stream?.getTracks().forEach((t) => t.stop());
     this.audioCtx?.close();
     this.processor = null;
+    this.analyser = null;
     this.stream = null;
     this.audioCtx = null;
     this.residual = new Float32Array(0);

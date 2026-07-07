@@ -13,6 +13,7 @@ async def create_connector_session(
     from_number: str,
     to_number: str,
     direction: str,
+    agent_name: str | None = None,
 ) -> str:
     """Call ConnectTwilioCall API and return the connect_url."""
     settings = get_settings()
@@ -36,9 +37,10 @@ async def create_connector_session(
         twilio_call_direction=call_direction,
     )
 
-    if settings.LIVEKIT_AGENT_NAME:
+    dispatch_name = agent_name or settings.LIVEKIT_AGENT_NAME
+    if dispatch_name:
         request.agents.append(
-            RoomAgentDispatch(agent_name=settings.LIVEKIT_AGENT_NAME)
+            RoomAgentDispatch(agent_name=dispatch_name)
         )
 
     try:

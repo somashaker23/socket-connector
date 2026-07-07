@@ -32,6 +32,7 @@ export default function App() {
   const [fromNumber, setFromNumber] = useState("+911234567890");
   const [toNumber, setToNumber] = useState("+910987654321");
   const [direction, setDirection] = useState("inbound");
+  const [agentName, setAgentName] = useState("");
 
   // State
   const [status, setStatus] = useState(STATUS.DISCONNECTED);
@@ -101,7 +102,7 @@ export default function App() {
       const res = await fetch(`${backendUrl}/smartflo/connect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callId, fromNumber, toNumber, direction }),
+        body: JSON.stringify({ callId, fromNumber, toNumber, direction, ...(agentName && { agentName }) }),
       });
       const data = await res.json();
       const latency = Math.round(performance.now() - t0);
@@ -227,12 +228,9 @@ export default function App() {
     await mic.start();
     micRef.current = mic;
 
-    if (mic.audioCtx && mic.processor) {
-      const analyser = mic.audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      mic.processor.connect(analyser);
-      micAnalyserRef.current = analyser;
-      micAnalyserDataRef.current = new Uint8Array(analyser.frequencyBinCount);
+    if (mic.analyser) {
+      micAnalyserRef.current = mic.analyser;
+      micAnalyserDataRef.current = new Uint8Array(mic.analyser.frequencyBinCount);
     }
 
     mediaTimestampRef.current = 0;
@@ -386,6 +384,8 @@ export default function App() {
                 <option value="inbound">Inbound</option>
                 <option value="outbound">Outbound</option>
               </select>
+              <label>Agent</label>
+              <input value={agentName} onChange={(e) => setAgentName(e.target.value)} disabled={isConnected} placeholder="default from .env" />
             </div>
             {connectUrl && <div className="connect-url">Session: <code>{connectUrl.split("/").pop()}</code></div>}
             <div className="btn-row">

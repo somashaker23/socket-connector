@@ -39,6 +39,7 @@ async def smartflo_connect(request: Request) -> JSONResponse:
     from_number = body.get("fromNumber", "")
     to_number = body.get("toNumber", "")
     direction = body.get("direction", "inbound")
+    agent_name = body.get("agentName", "")
 
     if not call_id:
         return JSONResponse({"success": False, "error": "callId is required"}, status_code=400)
@@ -50,6 +51,7 @@ async def smartflo_connect(request: Request) -> JSONResponse:
             from_number=from_number,
             to_number=to_number,
             direction=direction,
+            agent_name=agent_name or None,
         )
     except Exception as exc:
         metrics.connector_requests_total.labels(direction=direction, status="error").inc()
