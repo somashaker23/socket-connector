@@ -9,6 +9,12 @@ export default defineConfig({
       '/smartflo': {
         target: 'http://localhost:8000',
       },
+      '/api': {
+        target: 'http://localhost:8000',
+      },
+      '/admin': {
+        target: 'http://localhost:8000',
+      },
       '/health': {
         target: 'http://localhost:8000',
       },

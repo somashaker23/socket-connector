@@ -367,3 +367,75 @@ header h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Admin Panel */
+.admin-panel {
+  margin-bottom: 16px;
+}
+
+.admin-login-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-login-form input {
+  background: #0f0f1a;
+  border: 1px solid #2d2d44;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #e2e8f0;
+  font-size: 13px;
+  flex: 1;
+}
+
+.admin-error {
+  color: #f87171;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.provider-form {
+  background: #0f0f1a;
+  border: 1px solid #2d2d44;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.provider-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.provider-table th {
+  text-align: left;
+  color: #64748b;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-bottom: 1px solid #2d2d44;
+}
+
+.provider-table td {
+  padding: 8px;
+  border-bottom: 1px solid #1e1e2e;
+  color: #cbd5e1;
+}
+
+.provider-table .url-cell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+
+.btn-danger-sm {
+  color: #fca5a5 !important;
+  border-color: #7f1d1d !important;
+}
+.btn-danger-sm:hover {
+  background: #7f1d1d !important;
+}

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 from .connector import create_connector_session
+from .providers import list_providers
 from . import metrics
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ async def smartflo_connect(request: Request) -> JSONResponse:
     to_number = body.get("toNumber", "")
     direction = body.get("direction", "inbound")
     agent_name = body.get("agentName", "")
+    provider_id = body.get("providerId", "")
 
     if not call_id:
         return JSONResponse({"success": False, "error": "callId is required"}, status_code=400)
@@ -52,6 +54,7 @@ async def smartflo_connect(request: Request) -> JSONResponse:
             to_number=to_number,
             direction=direction,
             agent_name=agent_name or None,
+            provider_id=provider_id or None,
         )
     except Exception as exc:
         metrics.connector_requests_total.labels(direction=direction, status="error").inc()
@@ -128,6 +131,12 @@ async def ws_stream(websocket: WebSocket, session_id: str):
                 await websocket.close()
             except Exception:
                 pass
+
+
+@router.get("/api/providers")
+async def public_providers():
+    """Return only display names and IDs — no credentials."""
+    return [{"id": p.id, "display_name": p.display_name} for p in list_providers()]
 
 
 @router.get("/health")

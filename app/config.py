@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     LIVEKIT_API_KEY: str
     LIVEKIT_API_SECRET: str
     LIVEKIT_AGENT_NAME: str | None = None
+    ADMIN_PASSWORD: str | None = None
 
 
 @lru_cache

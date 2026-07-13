@@ -4,6 +4,7 @@ from livekit.api import LiveKitAPI, RoomAgentDispatch
 from livekit.protocol.connector_twilio import ConnectTwilioCallRequest
 
 from .config import get_settings
+from .providers import Provider, get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +15,22 @@ async def create_connector_session(
     to_number: str,
     direction: str,
     agent_name: str | None = None,
+    provider_id: str | None = None,
 ) -> str:
     """Call ConnectTwilioCall API and return the connect_url."""
     settings = get_settings()
 
+    # Use provider credentials if specified, else fall back to env vars
+    provider: Provider | None = None
+    if provider_id:
+        provider = get_provider(provider_id)
+        if not provider:
+            raise ValueError(f"Provider '{provider_id}' not found")
+
     api = LiveKitAPI(
-        url=settings.LIVEKIT_URL,
-        api_key=settings.LIVEKIT_API_KEY,
-        api_secret=settings.LIVEKIT_API_SECRET,
+        url=provider.livekit_url if provider else settings.LIVEKIT_URL,
+        api_key=provider.livekit_api_key if provider else settings.LIVEKIT_API_KEY,
+        api_secret=provider.livekit_api_secret if provider else settings.LIVEKIT_API_SECRET,
     )
 
     room_name = f"smartflo-{call_sid}"

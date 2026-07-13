@@ -8,6 +8,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from .logging import setup_logging
 from .routes import router
+from .admin import router as admin_router
 
 PLAYGROUND_DIR = Path(__file__).resolve().parent.parent / "playground" / "dist"
 
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(router)
+app.include_router(admin_router)
 
 Instrumentator().instrument(app).expose(app)
 

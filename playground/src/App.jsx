@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Waveform from "./components/Waveform";
 import DtmfKeypad from "./components/DtmfKeypad";
 import EventLog from "./components/EventLog";
 import LatencyPanel from "./components/LatencyPanel";
+import AdminPanel from "./components/AdminPanel";
 import { MicCapture, AudioPlayer } from "./utils/audio";
 import { CallRecorder } from "./utils/recorder";
 import {
@@ -26,6 +27,15 @@ function ts() {
 }
 
 export default function App() {
+  // Providers
+  const [providers, setProviders] = useState([]);
+  const [selectedProvider, setSelectedProvider] = useState("");
+  const [providersLoading, setProvidersLoading] = useState(true);
+
+  // Admin
+  const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
+  const [showAdmin, setShowAdmin] = useState(false);
+
   // Config
   const [backendUrl, setBackendUrl] = useState("");
   const [callId, setCallId] = useState(`call-${Date.now()}`);
@@ -70,6 +80,49 @@ export default function App() {
   const micAnalyserDataRef = useRef(null);
   const recorderRef = useRef(new CallRecorder());
 
+  // Fetch providers on mount
+  useEffect(() => {
+    fetchProviders();
+  }, []);
+
+  const fetchProviders = async () => {
+    try {
+      setProvidersLoading(true);
+      const res = await fetch(`${backendUrl}/api/providers`);
+      const data = await res.json();
+      setProviders(data);
+      if (data.length > 0 && !selectedProvider) {
+        setSelectedProvider(data[0].id);
+      }
+    } catch {
+      setProviders([]);
+    } finally {
+      setProvidersLoading(false);
+    }
+  };
+
+  const handleAdminLogin = async (password) => {
+    const res = await fetch(`${backendUrl}/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Login failed");
+    }
+    const data = await res.json();
+    setAdminToken(data.token);
+    localStorage.setItem("adminToken", data.token);
+    setShowAdmin(true);
+  };
+
+  const handleAdminLogout = () => {
+    setAdminToken("");
+    localStorage.removeItem("adminToken");
+    setShowAdmin(false);
+  };
+
   const addLog = useCallback((dir, event, detail = "") => {
     setLogs((prev) => {
       if (event === "media" && prev.length > 0) {
@@ -92,6 +145,11 @@ export default function App() {
   // --- Session Management ---
 
   const handleConnect = async () => {
+    if (!selectedProvider && providers.length > 0) {
+      addLog("SYS", "error", "Select a provider first");
+      return;
+    }
+
     setStatus(STATUS.CONNECTING);
     setLogs([]);
     statsRef.current = { connectLatency: null, wsHandshake: null, markRtt: null, mediaSent: 0, mediaRecv: 0, recvInterval: null, duration: "0:00", firstMediaLatency: null };
@@ -102,7 +160,14 @@ export default function App() {
       const res = await fetch(`${backendUrl}/smartflo/connect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callId, fromNumber, toNumber, direction, ...(agentName && { agentName }) }),
+        body: JSON.stringify({
+          callId,
+          fromNumber,
+          toNumber,
+          direction,
+          ...(agentName && { agentName }),
+          ...(selectedProvider && { providerId: selectedProvider }),
+        }),
       });
       const data = await res.json();
       const latency = Math.round(performance.now() - t0);
@@ -363,8 +428,33 @@ export default function App() {
               {healthStatus.status === "ok" ? "OK" : healthStatus.error}
             </span>
           )}
+          <button
+            className="btn-sm"
+            onClick={() => {
+              if (adminToken) {
+                setShowAdmin(!showAdmin);
+              } else {
+                setShowAdmin(true);
+              }
+            }}
+          >
+            {showAdmin ? "Close Admin" : "Admin"}
+          </button>
+          {adminToken && (
+            <button className="btn-sm" onClick={handleAdminLogout}>Logout</button>
+          )}
         </div>
       </header>
+
+      {showAdmin && (
+        <AdminPanel
+          adminToken={adminToken}
+          backendUrl={backendUrl}
+          onLogin={handleAdminLogin}
+          onClose={() => setShowAdmin(false)}
+          onProvidersChanged={fetchProviders}
+        />
+      )}
 
       <div className="main-grid">
         <div className="left-col">
@@ -373,6 +463,19 @@ export default function App() {
             <div className="form-grid">
               <label>Backend URL</label>
               <input value={backendUrl} onChange={(e) => setBackendUrl(e.target.value)} disabled={isConnected} />
+              <label>Provider</label>
+              <select
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                disabled={isConnected}
+              >
+                {providers.length === 0 && <option value="">
+                  {providersLoading ? "Loading..." : "No providers (use .env defaults)"}
+                </option>}
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>{p.display_name}</option>
+                ))}
+              </select>
               <label>Call ID</label>
               <input value={callId} onChange={(e) => setCallId(e.target.value)} disabled={isConnected} />
               <label>From</label>
@@ -385,7 +488,7 @@ export default function App() {
                 <option value="outbound">Outbound</option>
               </select>
               <label>Agent</label>
-              <input value={agentName} onChange={(e) => setAgentName(e.target.value)} disabled={isConnected} placeholder="default from .env" />
+              <input value={agentName} onChange={(e) => setAgentName(e.target.value)} disabled={isConnected} placeholder="default from provider" />
             </div>
             {connectUrl && <div className="connect-url">Session: <code>{connectUrl.split("/").pop()}</code></div>}
             <div className="btn-row">
