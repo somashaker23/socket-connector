@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import secrets
 import time
@@ -15,10 +16,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Test-only static endpoint for verifying SmartFlo's WS handshake and event
+# stream in isolation, without touching LiveKit. Not part of the call flow.
+SMARTFLO_TEST_TOKEN = "820abcqwerty"
+
+# Tracks connections to /ws/smartflo-test so scripts/pickup_test.py can poll
+# /ws/smartflo-test/status and detect a new connection without parsing logs.
+_test_ws_connect_count = 0
+_test_ws_last_connected_at: float | None = None
+
 # Store connect URLs server-side so LiveKit URLs are never exposed.
 # TTL-based cleanup: entries expire after 30s if unused.
 _pending_sessions: dict[str, tuple[str, float]] = {}
-_SESSION_TTL = 30.0  # seconds
+_SESSION_TTL = 120.0  # seconds
 
 
 def _cleanup_expired():
@@ -131,6 +141,64 @@ async def ws_stream(websocket: WebSocket, session_id: str):
                 await websocket.close()
             except Exception:
                 pass
+
+
+@router.websocket("/ws/smartflo-test")
+async def smartflo_test_stream(websocket: WebSocket):
+    """Static test endpoint: authenticates via X-Auth-Token and logs every
+    SmartFlo event verbatim. Bypasses LiveKit entirely — for verifying
+    SmartFlo's handshake and event stream in isolation. Not part of the call flow."""
+    client = websocket.client
+    # token = websocket.headers.get("x-auth-token")
+    # if token != SMARTFLO_TEST_TOKEN:
+    #     logger.warning("SmartFlo test WS rejected: bad token", extra={"client": str(client)})
+    #     await websocket.close(code=4001, reason="Invalid or missing X-Auth-Token")
+    #     return
+
+    await websocket.accept()
+    logger.info("SmartFlo test WS connected", extra={"client": str(client)})
+
+    global _test_ws_connect_count, _test_ws_last_connected_at
+    _test_ws_connect_count += 1
+    _test_ws_last_connected_at = time.time()
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                logger.warning("SmartFlo test WS non-JSON frame", extra={"raw": raw[:200]})
+                continue
+
+            event = data.get("event", "unknown")
+            if event == "media":
+                # Media frames arrive every ~20ms with a large base64 payload —
+                # log a summary instead of flooding the log with audio bytes.
+                media = data.get("media", {})
+                logger.info(
+                    "SmartFlo event: media",
+                    extra={
+                        "event": event,
+                        "chunk": media.get("chunk"),
+                        "media_timestamp": media.get("timestamp"),
+                        "payload_bytes": len(media.get("payload", "")),
+                    },
+                )
+            else:
+                logger.info(f"SmartFlo event: {event}", extra={"event": event, "payload": data})
+    except WebSocketDisconnect as exc:
+        logger.info("SmartFlo test WS disconnected", extra={"client": str(client), "code": exc.code})
+
+
+@router.get("/ws/smartflo-test/status")
+async def smartflo_test_status() -> dict:
+    """Polled by scripts/pickup_test.py to detect a new /ws/smartflo-test
+    connection without parsing logs."""
+    return {
+        "connect_count": _test_ws_connect_count,
+        "last_connected_at": _test_ws_last_connected_at,
+    }
 
 
 @router.get("/api/providers")
