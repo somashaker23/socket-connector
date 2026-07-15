@@ -25,6 +25,21 @@ SMARTFLO_TEST_TOKEN = "820abcqwerty"
 _test_ws_connect_count = 0
 _test_ws_last_connected_at: float | None = None
 
+# Browser clients connected to /ws/smartflo-test/logs, watching events live.
+_log_viewers: set[WebSocket] = set()
+
+
+async def _broadcast_log(entry: dict) -> None:
+    entry = {"timestamp": time.time(), **entry}
+    dead = []
+    for viewer in _log_viewers:
+        try:
+            await viewer.send_json(entry)
+        except Exception:
+            dead.append(viewer)
+    for viewer in dead:
+        _log_viewers.discard(viewer)
+
 # Store connect URLs server-side so LiveKit URLs are never exposed.
 # TTL-based cleanup: entries expire after 30s if unused.
 _pending_sessions: dict[str, tuple[str, float]] = {}
@@ -161,6 +176,7 @@ async def smartflo_test_stream(websocket: WebSocket):
     global _test_ws_connect_count, _test_ws_last_connected_at
     _test_ws_connect_count += 1
     _test_ws_last_connected_at = time.time()
+    await _broadcast_log({"type": "connect", "client": str(client)})
 
     try:
         while True:
@@ -169,6 +185,7 @@ async def smartflo_test_stream(websocket: WebSocket):
                 data = json.loads(raw)
             except ValueError:
                 logger.warning("SmartFlo test WS non-JSON frame", extra={"raw": raw[:200]})
+                await _broadcast_log({"type": "warning", "client": str(client), "raw": raw[:200]})
                 continue
 
             event = data.get("event", "unknown")
@@ -176,19 +193,37 @@ async def smartflo_test_stream(websocket: WebSocket):
                 # Media frames arrive every ~20ms with a large base64 payload —
                 # log a summary instead of flooding the log with audio bytes.
                 media = data.get("media", {})
-                logger.info(
-                    "SmartFlo event: media",
-                    extra={
-                        "event": event,
-                        "chunk": media.get("chunk"),
-                        "media_timestamp": media.get("timestamp"),
-                        "payload_bytes": len(media.get("payload", "")),
-                    },
-                )
+                summary = {
+                    "chunk": media.get("chunk"),
+                    "media_timestamp": media.get("timestamp"),
+                    "payload_bytes": len(media.get("payload", "")),
+                }
+                logger.info("SmartFlo event: media", extra={"event": event, **summary})
+                await _broadcast_log({"type": "event", "client": str(client), "event": event, "detail": summary})
             else:
                 logger.info(f"SmartFlo event: {event}", extra={"event": event, "payload": data})
+                await _broadcast_log({"type": "event", "client": str(client), "event": event, "detail": data})
     except WebSocketDisconnect as exc:
         logger.info("SmartFlo test WS disconnected", extra={"client": str(client), "code": exc.code})
+        await _broadcast_log({"type": "disconnect", "client": str(client), "code": exc.code})
+
+
+@router.websocket("/ws/smartflo-test/logs")
+async def smartflo_test_logs(websocket: WebSocket):
+    """Browser clients (playground live-logs page) connect here to watch
+    /ws/smartflo-test activity in real time. Read-only broadcast channel —
+    viewers never send anything meaningful, just held open until they close."""
+    await websocket.accept()
+    _log_viewers.add(websocket)
+    logger.info("Log viewer connected", extra={"client": str(websocket.client), "viewers": len(_log_viewers)})
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _log_viewers.discard(websocket)
+        logger.info("Log viewer disconnected", extra={"viewers": len(_log_viewers)})
 
 
 @router.get("/ws/smartflo-test/status")

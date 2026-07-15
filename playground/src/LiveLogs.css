@@ -1,0 +1,142 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Inter", -apple-system, system-ui, sans-serif;
+  background: #0f0f1a;
+  color: #e2e8f0;
+  min-height: 100vh;
+}
+
+.live-logs-app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+header {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #2d2d44;
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-bottom: 8px;
+}
+
+.status-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.config-row label {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.config-row input {
+  flex: 1;
+  background: #1a1a2e;
+  border: 1px solid #2d2d44;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+  border: 1px solid #2d2d44;
+  background: #1e1e2e;
+  color: #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-sm:hover {
+  background: #2d2d44;
+}
+
+.log-scroll {
+  flex: 1;
+  overflow-y: auto;
+  background: #1a1a2e;
+  border: 1px solid #2d2d44;
+  border-radius: 8px;
+  padding: 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+.empty-hint {
+  color: #64748b;
+  padding: 16px;
+  text-align: center;
+}
+
+.log-entry {
+  display: flex;
+  gap: 10px;
+  padding: 4px 8px;
+  border-left: 3px solid #9ca3af;
+  margin-bottom: 2px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.log-time {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.log-client {
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.log-type {
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.log-detail {
+  color: #94a3b8;
+  word-break: break-all;
+}
